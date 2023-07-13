@@ -24,3 +24,7 @@ for i in range(10):
     for y in range(7 - i, 0, -1):
         print(y, end=" ")
     print()
+
+my_list = [101, 20, 10, 50, 60]
+for item in my_list:
+    print(item)
