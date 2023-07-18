@@ -1,5 +1,9 @@
 import random
 
+import arcade
+
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
 
 def main():
     miles_traveled = 0
@@ -85,8 +89,11 @@ Your choice? """)
             thirst = 0
             canteen_drinks -= 1
 
-        else:  # If they want to drink from the empty canteen
+        elif canteen_drinks == 0:  # If they want to drink from the empty canteen
             print("There is no water left in your canteen.")
+
+        else:
+            print("What are you, stupid?")
 
         if 4 < thirst < 7:
             print("You are thirsty!")
@@ -112,8 +119,6 @@ Your choice? """)
         elif miles_traveled >= 200:
             print("You got out of the desert. You win!")
             done = True
-
-
 
 
 main()
