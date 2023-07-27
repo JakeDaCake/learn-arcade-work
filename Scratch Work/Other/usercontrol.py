@@ -88,7 +88,7 @@ class MyGame(arcade.Window):
 
 def main():
     window = MyGame(640, 480, "Drawing Example")
-    laser_sound = arcade.load_sound("laser.wav")
+    laser_sound = arcade.load_sound("../GoblinsWithGuns/laser.wav")
     arcade.play_sound(laser_sound)
     arcade.run()
 

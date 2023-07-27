@@ -6,12 +6,14 @@ import arcade
 # --- Constants ---
 SPRITE_SCALING_PLAYER = 0.5
 SPRITE_SCALING_COIN = 0.2
-COIN_COUNT = 50
+COIN_COUNT = 100
 SPRITE_SCALING_BOMB = .5
 BOMB_COUNT = 50
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
+
+done = False
 
 
 class Coin(arcade.Sprite):
@@ -54,7 +56,7 @@ class Bomb(arcade.Sprite):
     def update(self):
 
         # Move the coin
-        self.center_x -= 1
+        self.center_x -= 2
 
         # See if the bomb has fallen off the bottom of the screen.
         # If so, reset it.
@@ -156,9 +158,9 @@ class MyGame(arcade.Window):
 
         # Generate a list of all sprites that collided with the player.
         coin_hit_list = arcade.check_for_collision_with_list(self.player_sprite,
-                                                        self.coin_list)
+                                                             self.coin_list)
         bomb_hit_list = arcade.check_for_collision_with_list(self.player_sprite,
-                                                             self.bomb_list)
+                                                                 self.bomb_list)
 
         # Load coin collect sound
         coin_sound = arcade.load_sound(":resources:sounds/coin1.wav")
@@ -166,9 +168,14 @@ class MyGame(arcade.Window):
 
         # Loop through each colliding sprite, remove it, and add to the score.
         for coin in coin_hit_list:
-            coin.reset_pos()
+            coin.remove_from_sprite_lists()
             self.score += 1
             arcade.play_sound(coin_sound)
+            # check if there are any coins left
+            if len(self.coin_list) <= 0:
+                # Put the text on the screen.
+                print("You finished with " + str(self.score) + " points!")
+
 
         for bomb in bomb_hit_list:
             bomb.reset_pos()
