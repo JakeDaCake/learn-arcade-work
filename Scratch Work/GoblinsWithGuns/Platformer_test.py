@@ -18,7 +18,7 @@ SCREEN_TITLE = "Goblins With Guns"
 VIEWPORT_MARGIN = 220
 
 # How fast the camera pans to the player. 1.0 is instant.
-CAMERA_SPEED = 0.1
+CAMERA_SPEED = .1
 
 # How fast the character moves
 PLAYER_MOVEMENT_SPEED = 2
@@ -48,7 +48,64 @@ class Mana_Bar(arcade.Sprite):
         self.set_texture(frame)
 
 
+class Finish_Line(arcade.Sprite):
+    def __init__(self, texture_list):
+        super().__init__()
+
+        # Start at the first frame
+        self.current_texture = 0
+        self.textures = texture_list
+
+        self.last_first_frame = 0
+
+    def update(self):
+        self.set_texture(0)
+
+
 class Goblin(arcade.Sprite):
+    def __init__(self, texture_list, wall_list, box_list, coinbox_list):
+        super().__init__()
+
+        # Start at the first frame
+        self.current_texture = 0
+        self.textures = texture_list
+
+        self.last_first_frame = 0
+
+        self.physics_engine = None
+        self.box_physics_engine = None
+        self.coinbox_physics_engine = None
+
+        self.walls = wall_list
+        self.boxes = box_list
+        self.coinboxes = coinbox_list
+
+    def setup(self):
+        self.physics_engine = arcade.PhysicsEnginePlatformer(
+            self,
+            self.walls,
+            gravity_constant=GRAVITY
+        )
+        self.box_physics_engine = arcade.PhysicsEnginePlatformer(
+            self,
+            self.boxes,
+            gravity_constant=0
+        )
+        self.coinbox_physics_engine = arcade.PhysicsEnginePlatformer(
+            self,
+            self.coinboxes,
+            gravity_constant=0
+        )
+
+    def update(self):
+        self.setup()
+        self.set_texture(0)
+        self.physics_engine.update()
+        self.box_physics_engine.update()
+        self.coinbox_physics_engine.update()
+
+
+class Boom_Goblin(arcade.Sprite):
     def __init__(self, texture_list, wall_list, box_list, coinbox_list):
         super().__init__()
 
@@ -208,6 +265,9 @@ class MyGame(arcade.Window):
         """ Initializer """
         super().__init__(width, height, title, resizable=True)
 
+        # Is the game done?
+        self.DONE = False
+
         # How many lives and mana the player has left
         self.LIVES = 3
         self.MANA = 6
@@ -220,6 +280,7 @@ class MyGame(arcade.Window):
         self.player_list = None
         # self.mana_bar_list = None
         self.goblin_list = None
+        self.boom_goblin_list = None
         self.tree_goblin_list = None
         self.wall_list = None
         self.coinbox_list = None
@@ -229,6 +290,10 @@ class MyGame(arcade.Window):
         self.explodingbox_list = None
         self.fireball_list = None
         self.bullet_list = None
+        self.bomb_list = None
+
+        # Set up the finish line
+        self.finish_line_sprite = None
 
         # Set up the player
         self.player_sprite = None
@@ -244,7 +309,7 @@ class MyGame(arcade.Window):
         self.physics_engine = None
         self.boxes_physics_engine = None
         self.coin_boxes_physics_engine = None
-        self.goblin_boxes_physics_engine = None
+        self.boom_goblin_physics_engine = None
         self.tree_goblin_physics_engine = None
         self.tree_goblin_boxes_physics_engine = None
         self.entity_physics_engine = None
@@ -291,6 +356,7 @@ class MyGame(arcade.Window):
         # Sprite lists
         self.player_list = arcade.SpriteList()
         self.goblin_list = arcade.SpriteList()
+        self.boom_goblin_list = arcade.SpriteList()
         self.tree_goblin_list = arcade.SpriteList()
         self.wall_list = arcade.SpriteList()
         self.coinbox_list = arcade.SpriteList()
@@ -300,6 +366,7 @@ class MyGame(arcade.Window):
         self.explodingbox_list = arcade.SpriteList()
         self.fireball_list = arcade.SpriteList()
         self.bullet_list = arcade.SpriteList()
+        self.bomb_list = arcade.SpriteList()
 
         # --- Load our map
 
@@ -327,6 +394,9 @@ class MyGame(arcade.Window):
             self.player_list.append(self.player_sprite)
         draw_player(256, 512)
 
+        finish_line_texture_list = arcade.load_spritesheet("Finish_Line.png", 64, 64, 1, 2)
+        self.finish_line_sprite = Finish_Line(finish_line_texture_list)
+
 
         mana_texture_list = arcade.load_spritesheet("Mana.png", 64, 128, 4, 7)
         self.mana_bar_sprite = Mana_Bar(mana_texture_list)
@@ -338,9 +408,21 @@ class MyGame(arcade.Window):
             self.goblin_sprite.center_x = x
             self.goblin_sprite.center_y = y
             self.goblin_list.append(self.goblin_sprite)
-        #draw_goblin(500, 200)
-        #draw_goblin(900, 250)
-        #draw_goblin(1000, 200)
+        draw_goblin(500, 200)
+        draw_goblin(900, 250)
+        draw_goblin(1000, 200)
+        draw_goblin(2990, 200)
+
+        def draw_boom_goblin(x, y):
+            boom_goblin_texture_list = arcade.load_spritesheet("Boom_Gob.png", 64, 64, 2, 4)
+            self.boom_goblin_sprite = Boom_Goblin(boom_goblin_texture_list,
+                                                  self.wall_list, self.box_list, self.coinbox_list)
+            self.boom_goblin_sprite.center_x = x
+            self.boom_goblin_sprite.center_y = y
+            self.boom_goblin_list.append(self.boom_goblin_sprite)
+        # draw_boom_goblin(500, 200)
+        draw_boom_goblin(3000, 200)
+        draw_boom_goblin(3020, 200)
 
         # Set up Tree Goblins
         def draw_tree_goblin(x, y):
@@ -359,6 +441,11 @@ class MyGame(arcade.Window):
             self.player_sprite,
             self.wall_list,
             gravity_constant=GRAVITY
+        )
+        self.boom_goblin_physics_engine = arcade.PhysicsEnginePlatformer(
+            self.player_sprite,
+            self.boom_goblin_list,
+            gravity_constant=0
         )
         self.tree_goblin_physics_engine = arcade.PhysicsEnginePlatformer(
             self.tree_goblin_sprite,
@@ -385,18 +472,25 @@ class MyGame(arcade.Window):
         # Select the camera we'll use to draw all our sprites
         self.camera_sprites.use()
 
+        # Draw the finish line
+        self.finish_line_sprite.center_x = 3100
+        self.finish_line_sprite.center_y = 80
+        self.finish_line_sprite.draw()
+
         # Draw all the sprites.
         self.wall_list.draw()
         self.coinbox_list.draw()
         self.coin_list.draw()
         self.box_list.draw()
-        self.explosions_list.draw()
         self.explodingbox_list.draw()
         self.player_list.draw()
         self.goblin_list.draw()
+        self.boom_goblin_list.draw()
         self.tree_goblin_list.draw()
         self.fireball_list.draw()
         self.bullet_list.draw()
+        self.bomb_list.draw()
+        self.explosions_list.draw()
 
         # Draw the mana bar
         self.mana_bar_sprite.center_x = 50 + self.camera_sprites.position[0]
@@ -411,7 +505,8 @@ class MyGame(arcade.Window):
         output = f"Lives: {self.LIVES}"
         arcade.draw_text(output, 10 + self.camera_sprites.position[0], 20 + self.camera_sprites.position[1],
                          arcade.color.WHITE, 14)
-        if self.LIVES == 0:
+        if self.LIVES <= 0:
+            self.LIVES = 0
             gameover = "Game Over!"
             arcade.draw_text(gameover, self.camera_sprites.position[0] + 200, DEFAULT_SCREEN_HEIGHT / 2,
                              arcade.color.WHITE, 14)
@@ -419,6 +514,28 @@ class MyGame(arcade.Window):
             arcade.draw_text(gameover, self.camera_sprites.position[0] + 200, DEFAULT_SCREEN_HEIGHT / 2 - 20,
                              arcade.color.WHITE, 14)
             self.player_sprite.remove_from_sprite_lists()
+        if self.DONE == True:
+            youwin = "YAYAYAYYAAY YOU WON BEBEAH"
+            arcade.draw_text(youwin, self.camera_sprites.position[0] + 120, DEFAULT_SCREEN_HEIGHT - 50,
+                             arcade.color.WHITE, 25)
+            credits = "Credits:"
+            arcade.draw_text(credits, self.camera_sprites.position[0] + 380, DEFAULT_SCREEN_HEIGHT - 100,
+                             arcade.color.WHITE, 14)
+            credits1 = "Programming: Jake      Art: Jake       Sounds: Google     Refreshments: Jake      Ideas: Jake"
+            arcade.draw_text(credits1, self.camera_sprites.position[0] + 40, DEFAULT_SCREEN_HEIGHT - 150,
+                             arcade.color.WHITE, 14)
+            credits2 = "Hotel: Trivago      Playtesting: Jake, Jake, & Jake       Level design: Jake"
+            arcade.draw_text(credits2, self.camera_sprites.position[0] + 100, DEFAULT_SCREEN_HEIGHT - 200,
+                             arcade.color.WHITE, 14)
+            credits3 = "Producer: Stuart Rosenthal      Honorary mentions: Jake     Special thanks to: Gabriel"
+            arcade.draw_text(credits3, self.camera_sprites.position[0] + 50, DEFAULT_SCREEN_HEIGHT - 250,
+                             arcade.color.WHITE, 14)
+            credits4 = "www.Youtube.com/c/Jakedacake"
+            arcade.draw_text(credits4, self.camera_sprites.position[0] + 270, DEFAULT_SCREEN_HEIGHT - 300,
+                             arcade.color.WHITE, 14)
+            youwin = "Tap anywhere to restart."
+            arcade.draw_text(youwin, self.camera_sprites.position[0] + 300, DEFAULT_SCREEN_HEIGHT - 440,
+                             arcade.color.WHITE, 14)
 
 
 
@@ -464,45 +581,53 @@ class MyGame(arcade.Window):
     def on_mouse_press(self, x, y, button, modifiers):
         """ Called whenever the mouse button is clicked. """
 
-        if self.LIVES > 0:
-            if self.MANA > 0:
-                # Create a fireball
-                fireball = arcade.Sprite("fireball.gif", SPRITE_SCALING)
-                arcade.play_sound(self.fireball_sound)
+        if self.DONE == False:
+            if self.LIVES > 0:
+                if self.MANA > 0:
+                    # Create a fireball
+                    fireball = arcade.Sprite("fireball.gif", SPRITE_SCALING)
+                    arcade.play_sound(self.fireball_sound)
 
-                # Position the fireball at the player's current location
-                start_x = self.player_sprite.center_x
-                start_y = self.player_sprite.center_y
-                fireball.center_x = start_x
-                fireball.center_y = start_y
+                    # Position the fireball at the player's current location
+                    start_x = self.player_sprite.center_x
+                    start_y = self.player_sprite.center_y
+                    fireball.center_x = start_x
+                    fireball.center_y = start_y
 
-                # Get from the mouse the destination location for the fireball
-                # Adjust mouse coordinates based on camera position
-                dest_x = x + self.camera_sprites.position[0]
-                dest_y = y + self.camera_sprites.position[1]
+                    # Get from the mouse the destination location for the fireball
+                    # Adjust mouse coordinates based on camera position
+                    dest_x = x + self.camera_sprites.position[0]
+                    dest_y = y + self.camera_sprites.position[1]
 
-                # Do math to calculate how to get the fireball to the destination.
-                # Calculation the angle in radians between the start points
-                # and end points. This is the angle the fireball will travel.
-                x_diff = (dest_x - start_x) * DEFAULT_SCREEN_WIDTH
-                y_diff = (dest_y - start_y) * DEFAULT_SCREEN_HEIGHT
-                angle = math.atan2(y_diff, x_diff)
+                    # Do math to calculate how to get the fireball to the destination.
+                    # Calculation the angle in radians between the start points
+                    # and end points. This is the angle the fireball will travel.
+                    x_diff = (dest_x - start_x) * DEFAULT_SCREEN_WIDTH
+                    y_diff = (dest_y - start_y) * DEFAULT_SCREEN_HEIGHT
+                    angle = math.atan2(y_diff, x_diff)
 
-                # Angle the fireball sprite so it doesn't look like it is flying
-                # sideways.
-                fireball.angle = math.degrees(angle)
-                print(f"Fireball angle: {fireball.angle:.2f}")
+                    # Angle the fireball sprite so it doesn't look like it is flying
+                    # sideways.
+                    fireball.angle = math.degrees(angle)
+                    print(f"Fireball angle: {fireball.angle:.2f}")
 
-                # Taking into account the angle, calculate our change_x
-                # and change_y. Velocity is how fast the fireball travels.
-                fireball.change_x = math.cos(angle) * PROJECTILE_SPEED
-                fireball.change_y = math.sin(angle) * PROJECTILE_SPEED
+                    # Taking into account the angle, calculate our change_x
+                    # and change_y. Velocity is how fast the fireball travels.
+                    fireball.change_x = math.cos(angle) * PROJECTILE_SPEED
+                    fireball.change_y = math.sin(angle) * PROJECTILE_SPEED
 
-                # Add the fireball to the appropriate lists
-                self.fireball_list.append(fireball)
-                self.MANA -= 1
+                    # Add the fireball to the appropriate lists
+                    self.fireball_list.append(fireball)
+                    self.MANA -= 1
 
+            else:
+                self.DONE = False
+                self.setup()
+                self.LIVES = 3
+                self.score = 0
+                self.MANA = 6
         else:
+            self.DONE = False
             self.setup()
             self.LIVES = 3
             self.score = 0
@@ -513,168 +638,267 @@ class MyGame(arcade.Window):
         self.explosions_list.update()
         self.coin_list.update()
 
-        if self.LIVES > 0:
-            # Update everything.
-            if self.MANA == 6:
-                self.mana_bar_sprite.update(0)
-            elif self.MANA == 5:
-                self.mana_bar_sprite.update(1)
-            elif self.MANA == 4:
-                self.mana_bar_sprite.update(2)
-            elif self.MANA == 3:
-                self.mana_bar_sprite.update(3)
-            elif self.MANA == 2:
-                self.mana_bar_sprite.update(4)
-            elif self.MANA == 1:
-                self.mana_bar_sprite.update(5)
-            else:
-                self.mana_bar_sprite.update(6)
-            self.fireball_list.update()
-            self.goblin_list.update()
-            self.bullet_list.update()
-            if self.tree_goblin_sprite.lives == 2:
-                self.tree_goblin_sprite.update(0, 0)
-            elif self.tree_goblin_sprite.lives == 1:
-                self.tree_goblin_sprite.update(1, 1)
-            else:
-                self.tree_goblin_sprite.update(2, 2)
+        # Check the player touched the finish line
+        hit_list = arcade.check_for_collision_with_list(self.finish_line_sprite, self.player_list)
+        # If it did, get rid of the fireball
+        if len(hit_list) > 0:
+            self.DONE = True
+            self.finish_line_sprite.set_texture(1)
 
-            # Calculate speed based on the keys pressed
-            self.player_sprite.change_x = 0
-            # self.player_sprite.change_y = 0
 
-            if self.left_pressed and not self.right_pressed:
-                self.player_sprite.change_x = -PLAYER_MOVEMENT_SPEED
-                self.player_sprite.update(0, 4)
-                self.last_move = 'left'
-            elif self.right_pressed and not self.left_pressed:
-                self.player_sprite.change_x = PLAYER_MOVEMENT_SPEED
-                self.player_sprite.update(5, 7)
-                self.last_move = 'right'
-            else:
-                if self.last_move == 'left':
-                    self.player_sprite.update(0, 0)
+        if self.DONE == False:
+            if self.LIVES > 0:
+                # Update everything.
+                if self.MANA == 6:
+                    self.mana_bar_sprite.update(0)
+                elif self.MANA == 5:
+                    self.mana_bar_sprite.update(1)
+                elif self.MANA == 4:
+                    self.mana_bar_sprite.update(2)
+                elif self.MANA == 3:
+                    self.mana_bar_sprite.update(3)
+                elif self.MANA == 2:
+                    self.mana_bar_sprite.update(4)
+                elif self.MANA == 1:
+                    self.mana_bar_sprite.update(5)
                 else:
-                    self.player_sprite.update(7, 7)
+                    self.mana_bar_sprite.update(6)
+                self.fireball_list.update()
+                self.goblin_list.update()
+                self.boom_goblin_list.update()
+                self.bullet_list.update()
+                self.bomb_list.update()
+                if self.tree_goblin_sprite.lives == 2:
+                    self.tree_goblin_sprite.update(0, 0)
+                elif self.tree_goblin_sprite.lives == 1:
+                    self.tree_goblin_sprite.update(1, 1)
+                else:
+                    self.tree_goblin_sprite.update(2, 2)
 
-            # Call update on all sprites (The sprites don't do much in this
-            # example though.)
-            self.physics_engine.update()
-            self.boxes_physics_engine = arcade.PhysicsEnginePlatformer(
-                self.player_sprite,
-                self.box_list,
-                gravity_constant=0
-            )
-            self.boxes_physics_engine.update()
-            self.coin_boxes_physics_engine = arcade.PhysicsEnginePlatformer(
-                self.player_sprite,
-                self.coinbox_list,
-                gravity_constant=0
-            )
-            self.coin_boxes_physics_engine.update()
-            self.entity_physics_engine.update()
-            self.tree_goblin_boxes_physics_engine.update()
-            self.tree_goblin_physics_engine.update()
+                self.finish_line_sprite.update()
 
-            # Scroll the screen to the player
-            self.scroll_to_player()
+                # Calculate speed based on the keys pressed
+                self.player_sprite.change_x = 0
+                # self.player_sprite.change_y = 0
 
-            # Loop through each fireball
-            for fireball in self.fireball_list:
+                if self.left_pressed and not self.right_pressed:
+                    self.player_sprite.change_x = -PLAYER_MOVEMENT_SPEED
+                    self.player_sprite.update(0, 4)
+                    self.last_move = 'left'
+                elif self.right_pressed and not self.left_pressed:
+                    self.player_sprite.change_x = PLAYER_MOVEMENT_SPEED
+                    self.player_sprite.update(5, 7)
+                    self.last_move = 'right'
+                else:
+                    if self.last_move == 'left':
+                        self.player_sprite.update(0, 0)
+                    else:
+                        self.player_sprite.update(7, 7)
 
-                # Check this fireball to see if it hit a wall
-                hit_list = arcade.check_for_collision_with_list(fireball, self.wall_list)
-                # If it did, get rid of the fireball
-                if len(hit_list) > 0:
-                    fireball.remove_from_sprite_lists()
-                # Check this fireball to see if it hit a tree goblin
-                hit_list = arcade.check_for_collision_with_list(fireball, self.tree_goblin_list)
-                # If it did, get rid of the fireball and goblin
-                if len(hit_list) > 0 and self.tree_goblin_sprite.lives > 0:
-                    arcade.play_sound(self.hit_sound)
-                    fireball.remove_from_sprite_lists()
-                    self.tree_goblin_sprite.lives -= 1
-                    self.score += 5
+                # Call update on all sprites (The sprites don't do much in this
+                # example though.)
+                self.physics_engine.update()
+                self.boxes_physics_engine = arcade.PhysicsEnginePlatformer(
+                    self.player_sprite,
+                    self.box_list,
+                    gravity_constant=0
+                )
+                self.boxes_physics_engine.update()
+                self.coin_boxes_physics_engine = arcade.PhysicsEnginePlatformer(
+                    self.player_sprite,
+                    self.coinbox_list,
+                    gravity_constant=0
+                )
+                self.coin_boxes_physics_engine.update()
+                self.boom_goblin_physics_engine.update()
+                self.entity_physics_engine.update()
+                self.tree_goblin_boxes_physics_engine.update()
+                self.tree_goblin_physics_engine.update()
 
-                # Check this fireball to see if it flew too far
-                num = 250
-                max_x = self.player_sprite.center_x + num
-                min_x = self.player_sprite.center_x - num
-                max_y = self.player_sprite.center_y + num
-                min_y = self.player_sprite.center_y - num
-                if fireball.center_x > max_x or fireball.center_x < min_x or fireball.center_y > max_y or fireball.center_y < min_y:
-                    fireball.remove_from_sprite_lists()
+                # Scroll the screen to the player
+                self.scroll_to_player()
 
-            # Goblin follows player
-            # if
+                # Loop through each fireball
+                for fireball in self.fireball_list:
 
-            self.frame_count += 1
+                    # Check this fireball to see if it hit a wall
+                    hit_list = arcade.check_for_collision_with_list(fireball, self.wall_list)
+                    # If it did, get rid of the fireball
+                    if len(hit_list) > 0:
+                        fireball.remove_from_sprite_lists()
+                    # Check this fireball to see if it hit a tree goblin
+                    hit_list = arcade.check_for_collision_with_list(fireball, self.tree_goblin_list)
+                    # If it did, get rid of the fireball and goblin
+                    if len(hit_list) > 0 and self.tree_goblin_sprite.lives > 0:
+                        arcade.play_sound(self.hit_sound)
+                        fireball.remove_from_sprite_lists()
+                        self.tree_goblin_sprite.lives -= 1
+                        self.score += 5
 
-            if self.MANA < 6 and self.frame_count % 100 == 0:
-                self.MANA += 1
+                    # Check this fireball to see if it flew too far
+                    num = 250
+                    max_x = self.player_sprite.center_x + num
+                    min_x = self.player_sprite.center_x - num
+                    max_y = self.player_sprite.center_y + num
+                    min_y = self.player_sprite.center_y - num
+                    if fireball.center_x > max_x or fireball.center_x < min_x or fireball.center_y > max_y or fireball.center_y < min_y:
+                        fireball.remove_from_sprite_lists()
 
-            for box in self.box_list:
-                # Check this bullet to see if it hit a wall
-                hit_list = arcade.check_for_collision_with_list(box, self.fireball_list)
-                # If it did, get rid of the bullet
-                if len(hit_list) > 0:
-                    arcade.play_sound(self.hit_sound)
-                    box.remove_from_sprite_lists()
-                    fireball.remove_from_sprite_lists()
+                # Goblin follows player
+                # if
 
-            for coin_box in self.coinbox_list:
-                # Check this bullet to see if it hit a wall
-                hit_list = arcade.check_for_collision_with_list(coin_box, self.fireball_list)
-                # If it did, get rid of the bullet
-                if len(hit_list) > 0:
-                    # Make an explosion
-                    coin = Coin(self.coin_texture_list)
-                    # Move it to the location of the box
-                    coin.center_x = coin_box.center_x
-                    coin.center_y = coin_box.center_y
-                    # Call update() because it sets which image we start on
-                    coin.update()
-                    # Add to a list of sprites that are explosions
-                    self.coin_list.append(coin)
-                    coin_box.remove_from_sprite_lists()
-                    fireball.remove_from_sprite_lists()
-                    arcade.play_sound(self.coin_sound)
+                self.frame_count += 1
 
-            for exploding_box in self.explodingbox_list:
-                # Check the box was hit
-                hit_list = arcade.check_for_collision_with_list(exploding_box, self.fireball_list)
-                # If it was, get rid of the box and fireball
-                if len(hit_list) > 0:
-                    # Make an explosion
-                    explosion = Explosion(self.explosion_texture_list)
-                    # Move it to the location of the box
-                    explosion.center_x = hit_list[0].center_x
-                    explosion.center_y = hit_list[0].center_y
-                    # Call update() because it sets which image we start on
-                    explosion.update()
-                    # Add to a list of sprites that are explosions
-                    self.explosions_list.append(explosion)
-                    exploding_box.remove_from_sprite_lists()
-                    fireball.remove_from_sprite_lists()
-                    arcade.play_sound(self.explosion_sound)
-                hit_list = arcade.check_for_collision_with_list(exploding_box, self.player_list)
-                if len(hit_list) > 0:
-                    # Make an explosion
-                    explosion = Explosion(self.explosion_texture_list)
-                    # Move it to the location of the box
-                    explosion.center_x = hit_list[0].center_x
-                    explosion.center_y = hit_list[0].center_y
-                    # Call update() because it sets which image we start on
-                    explosion.update()
-                    # Add to a list of sprites that are explosions
-                    self.explosions_list.append(explosion)
-                    exploding_box.remove_from_sprite_lists()
-                    self.LIVES = 0
-                    arcade.play_sound(self.explosion_sound)
+                if self.MANA < 6 and self.frame_count % 100 == 0:
+                    self.MANA += 1
 
-            if self.tree_goblin_sprite.lives > 0:
-                # Loop through each tree goblin that we have
-                for goblin in self.tree_goblin_list:
+                for box in self.box_list:
+                    # Check this bullet to see if it hit a wall
+                    hit_list = arcade.check_for_collision_with_list(box, self.fireball_list)
+                    # If it did, get rid of the bullet
+                    if len(hit_list) > 0:
+                        arcade.play_sound(self.hit_sound)
+                        box.remove_from_sprite_lists()
+                        fireball.remove_from_sprite_lists()
+
+                for coin_box in self.coinbox_list:
+                    # Check this bullet to see if it hit a wall
+                    hit_list = arcade.check_for_collision_with_list(coin_box, self.fireball_list)
+                    # If it did, get rid of the bullet
+                    if len(hit_list) > 0:
+                        # Make an explosion
+                        coin = Coin(self.coin_texture_list)
+                        # Move it to the location of the box
+                        coin.center_x = coin_box.center_x
+                        coin.center_y = coin_box.center_y
+                        # Call update() because it sets which image we start on
+                        coin.update()
+                        # Add to a list of sprites that are explosions
+                        self.coin_list.append(coin)
+                        coin_box.remove_from_sprite_lists()
+                        fireball.remove_from_sprite_lists()
+                        arcade.play_sound(self.coin_sound)
+
+                for exploding_box in self.explodingbox_list:
+                    # Check the box was hit
+                    hit_list = arcade.check_for_collision_with_list(exploding_box, self.fireball_list)
+                    # If it was, get rid of the box and fireball
+                    if len(hit_list) > 0:
+                        # Make an explosion
+                        explosion = Explosion(self.explosion_texture_list)
+                        # Move it to the location of the box
+                        explosion.center_x = hit_list[0].center_x
+                        explosion.center_y = hit_list[0].center_y
+                        # Call update() because it sets which image we start on
+                        explosion.update()
+                        # Add to a list of sprites that are explosions
+                        self.explosions_list.append(explosion)
+                        exploding_box.remove_from_sprite_lists()
+                        fireball.remove_from_sprite_lists()
+                        arcade.play_sound(self.explosion_sound)
+                    hit_list = arcade.check_for_collision_with_list(exploding_box, self.player_list)
+                    if len(hit_list) > 0:
+                        # Make an explosion
+                        explosion = Explosion(self.explosion_texture_list)
+                        # Move it to the location of the box
+                        explosion.center_x = hit_list[0].center_x
+                        explosion.center_y = hit_list[0].center_y
+                        # Call update() because it sets which image we start on
+                        explosion.update()
+                        # Add to a list of sprites that are explosions
+                        self.explosions_list.append(explosion)
+                        exploding_box.remove_from_sprite_lists()
+                        self.LIVES = 0
+                        arcade.play_sound(self.explosion_sound)
+
+                if self.tree_goblin_sprite.lives > 0:
+                    # Loop through each tree goblin that we have
+                    for goblin in self.tree_goblin_list:
+                        # First, calculate the angle to the player. We could do this
+                        # only when the bullet fires, but in this case we will rotate
+                        # the enemy to face the player each frame, so we'll do this
+                        # each frame.
+
+                        # Position the start at the enemy's current location
+                        start_x = goblin.center_x
+                        start_y = goblin.center_y - 50
+
+                        # Get the destination location for the bullet
+                        dest_x = self.player_sprite.center_x
+                        dest_y = self.player_sprite.center_y
+
+                        # Do math to calculate how to get the bullet to the destination.
+                        # Calculation the angle in radians between the start points
+                        # and end points. This is the angle the bullet will travel.
+                        x_diff = dest_x - start_x
+                        y_diff = dest_y - start_y
+                        angle = math.atan2(y_diff, x_diff)
+
+
+                        # Shoot every 60-180 frames change of shooting each frame
+                        if self.frame_count % random.randint(20, 100) == 0:
+                            bullet = arcade.Sprite("bullet.png", SPRITE_SCALING)
+                            bullet.center_x = start_x
+                            bullet.center_y = start_y
+
+                            # Angle the bullet sprite
+                            bullet.angle = math.degrees(angle)
+
+                            # Taking into account the angle, calculate our change_x
+                            # and change_y. Velocity is how fast the bullet travels.
+                            bullet.change_x = math.cos(angle) * PROJECTILE_SPEED
+                            bullet.change_y = math.sin(angle) * PROJECTILE_SPEED
+
+                            self.bullet_list.append(bullet)
+
+                        if self.tree_goblin_sprite.lives == 2:
+                            # First, calculate the angle to the player. We could do this
+                            # only when the bullet fires, but in this case we will rotate
+                            # the enemy to face the player each frame, so we'll do this
+                            # each frame.
+
+                            # Position the start at the enemy's current location
+                            start_x = goblin.center_x
+                            start_y = goblin.center_y
+
+                            # Get the destination location for the bullet
+                            dest_x = self.player_sprite.center_x
+                            dest_y = self.player_sprite.center_y
+
+                            # Do math to calculate how to get the bullet to the destination.
+                            # Calculation the angle in radians between the start points
+                            # and end points. This is the angle the bullet will travel.
+                            x_diff = dest_x - start_x
+                            y_diff = dest_y - start_y
+                            angle = math.atan2(y_diff, x_diff)
+
+                            # Shoot every 60-180 frames change of shooting each frame
+                            if self.frame_count % random.randint(20, 100) == 0:
+                                bullet = arcade.Sprite("bullet.png", SPRITE_SCALING)
+                                bullet.center_x = start_x
+                                bullet.center_y = start_y
+
+                                # Angle the bullet sprite
+                                bullet.angle = math.degrees(angle)
+
+                                # Taking into account the angle, calculate our change_x
+                                # and change_y. Velocity is how fast the bullet travels.
+                                bullet.change_x = math.cos(angle) * (PROJECTILE_SPEED + 2)
+                                bullet.change_y = math.sin(angle) * (PROJECTILE_SPEED + 2)
+
+                                self.bullet_list.append(bullet)
+
+                            # Loop through each standard goblin that we have
+                for goblin in self.goblin_list:
+
+                    hit_list = arcade.check_for_collision_with_list(goblin, self.fireball_list)
+                    # If it did, get rid of the fireball and goblin
+                    if len(hit_list) > 0:
+                        goblin.remove_from_sprite_lists()
+                        fireball.remove_from_sprite_lists()
+                        arcade.play_sound(self.hit_sound)
+                        self.score += 5
+
                     # First, calculate the angle to the player. We could do this
                     # only when the bullet fires, but in this case we will rotate
                     # the enemy to face the player each frame, so we'll do this
@@ -682,7 +906,7 @@ class MyGame(arcade.Window):
 
                     # Position the start at the enemy's current location
                     start_x = goblin.center_x
-                    start_y = goblin.center_y - 50
+                    start_y = goblin.center_y
 
                     # Get the destination location for the bullet
                     dest_x = self.player_sprite.center_x
@@ -695,6 +919,17 @@ class MyGame(arcade.Window):
                     y_diff = dest_y - start_y
                     angle = math.atan2(y_diff, x_diff)
 
+                    # Set the enemy to face the player.
+                    # goblin.angle = math.degrees(angle) + 180
+
+                    # Make the enemy follow the player if they are close enough
+                    if math.fabs(goblin.center_x - self.player_sprite.center_x) <= 300:
+                        if goblin.center_x > self.player_sprite.center_x:
+                            goblin.center_x -= GOBLIN_MOVEMENT_SPEED
+                            goblin.set_texture(0)
+                        elif goblin.center_x < self.player_sprite.center_x:
+                            goblin.center_x += GOBLIN_MOVEMENT_SPEED
+                            goblin.set_texture(1)
 
                     # Shoot every 60-180 frames change of shooting each frame
                     if self.frame_count % random.randint(20, 100) == 0:
@@ -712,49 +947,22 @@ class MyGame(arcade.Window):
 
                         self.bullet_list.append(bullet)
 
-                    if self.tree_goblin_sprite.lives == 2:
-                        # First, calculate the angle to the player. We could do this
-                        # only when the bullet fires, but in this case we will rotate
-                        # the enemy to face the player each frame, so we'll do this
-                        # each frame.
+                # Boom goblin behavior
+                for goblin in self.boom_goblin_list:
 
-                        # Position the start at the enemy's current location
-                        start_x = goblin.center_x
-                        start_y = goblin.center_y
-
-                        # Get the destination location for the bullet
-                        dest_x = self.player_sprite.center_x
-                        dest_y = self.player_sprite.center_y
-
-                        # Do math to calculate how to get the bullet to the destination.
-                        # Calculation the angle in radians between the start points
-                        # and end points. This is the angle the bullet will travel.
-                        x_diff = dest_x - start_x
-                        y_diff = dest_y - start_y
-                        angle = math.atan2(y_diff, x_diff)
-
-                        # Shoot every 60-180 frames change of shooting each frame
-                        if self.frame_count % random.randint(20, 100) == 0:
-                            bullet = arcade.Sprite("bullet.png", SPRITE_SCALING)
-                            bullet.center_x = start_x
-                            bullet.center_y = start_y
-
-                            # Angle the bullet sprite
-                            bullet.angle = math.degrees(angle)
-
-                            # Taking into account the angle, calculate our change_x
-                            # and change_y. Velocity is how fast the bullet travels.
-                            bullet.change_x = math.cos(angle) * (PROJECTILE_SPEED + 2)
-                            bullet.change_y = math.sin(angle) * (PROJECTILE_SPEED + 2)
-
-                            self.bullet_list.append(bullet)
-
-                        # Loop through each standard goblin that we have
-                    for goblin in self.goblin_list:
-
+                    if math.fabs(goblin.center_x - self.player_sprite.center_x) < 500:
                         hit_list = arcade.check_for_collision_with_list(goblin, self.fireball_list)
                         # If it did, get rid of the fireball and goblin
                         if len(hit_list) > 0:
+                            # Make an explosion
+                            explosion = Explosion(self.explosion_texture_list)
+                            # Move it to the location of the box
+                            explosion.center_x = goblin.center_x
+                            explosion.center_y = goblin.center_y
+                            # Call update() because it sets which image we start on
+                            explosion.update()
+                            # Add to a list of sprites that are explosions
+                            self.explosions_list.append(explosion)
                             goblin.remove_from_sprite_lists()
                             fireball.remove_from_sprite_lists()
                             arcade.play_sound(self.hit_sound)
@@ -787,77 +995,161 @@ class MyGame(arcade.Window):
                         if math.fabs(goblin.center_x - self.player_sprite.center_x) <= 300:
                             if goblin.center_x > self.player_sprite.center_x:
                                 goblin.center_x -= GOBLIN_MOVEMENT_SPEED
-                                goblin.set_texture(0)
+                                if self.frame_count >= 50:
+                                    goblin.set_texture(0)
+                                else:
+                                    goblin.set_texture(1)
                             elif goblin.center_x < self.player_sprite.center_x:
                                 goblin.center_x += GOBLIN_MOVEMENT_SPEED
+                                if self.frame_count >= 50:
+                                    goblin.set_texture(2)
+                                else:
+                                    goblin.set_texture(3)
+
+                        # Shoot every 100 frames change of shooting each frame
+                        if self.frame_count % 100 == 0:
+                            bomb = arcade.Sprite("boombox.png", SPRITE_SCALING)
+                            bomb.center_x = start_x
+                            bomb.center_y = start_y
+                            if goblin.center_x > self.player_sprite.center_x:
                                 goblin.set_texture(1)
+                            elif goblin.center_x < self.player_sprite.center_x:
+                                goblin.set_texture(3)
+                            self.frame_count = 0
 
-                        # Shoot every 60-180 frames change of shooting each frame
-                        if self.frame_count % random.randint(20, 100) == 0:
-                            bullet = arcade.Sprite("bullet.png", SPRITE_SCALING)
-                            bullet.center_x = start_x
-                            bullet.center_y = start_y
-
-                            # Angle the bullet sprite
-                            bullet.angle = math.degrees(angle)
+                            # Angle the bomb sprite
+                            # bomb.angle = math.degrees(angle)
 
                             # Taking into account the angle, calculate our change_x
                             # and change_y. Velocity is how fast the bullet travels.
-                            bullet.change_x = math.cos(angle) * PROJECTILE_SPEED
-                            bullet.change_y = math.sin(angle) * PROJECTILE_SPEED
+                            bomb.change_x = math.cos(angle) * PROJECTILE_SPEED
+                            bomb.change_y = math.sin(angle) * PROJECTILE_SPEED
 
-                            self.bullet_list.append(bullet)
+                            self.bomb_list.append(bomb)
 
-            for bullet in self.bullet_list:
+                for bullet in self.bullet_list:
 
-                # Check this bullet to see if it hit a wall
-                hit_list = arcade.check_for_collision_with_list(bullet, self.wall_list)
-                # If it did, get rid of the bullet
-                if len(hit_list) > 0:
-                    bullet.remove_from_sprite_lists()
-                # Check this bullet to see if it hit a goblin
-                hit_list = arcade.check_for_collision_with_list(bullet, self.player_list)
-                # If it did, get rid of the bullet
-                if len(hit_list) > 0:
-                    bullet.remove_from_sprite_lists()
-                    self.LIVES -= 1
-                    arcade.play_sound(self.hit_sound)
-                # Check if this bullet hit a fireball
-                hit_list = arcade.check_for_collision_with_list(bullet, self.fireball_list)
-                # If it did, get rid of the bullet
-                if len(hit_list) > 0:
-                    bullet.remove_from_sprite_lists()
-                    fireball.remove_from_sprite_lists()
+                    # Check this bullet to see if it hit a wall
+                    hit_list = arcade.check_for_collision_with_list(bullet, self.wall_list)
+                    # If it did, get rid of the bullet
+                    if len(hit_list) > 0:
+                        bullet.remove_from_sprite_lists()
+                    # Check this bullet to see if it hit a goblin
+                    hit_list = arcade.check_for_collision_with_list(bullet, self.player_list)
+                    # If it did, get rid of the bullet
+                    if len(hit_list) > 0:
+                        bullet.remove_from_sprite_lists()
+                        self.LIVES -= 1
+                        arcade.play_sound(self.hit_sound)
+                    # Check if this bullet hit a fireball
+                    hit_list = arcade.check_for_collision_with_list(bullet, self.fireball_list)
+                    # If it did, get rid of the bullet
+                    if len(hit_list) > 0:
+                        bullet.remove_from_sprite_lists()
+                        fireball.remove_from_sprite_lists()
 
-                # Check this bullet to see if it flew too far
-                num = 500
-                max_x = self.player_sprite.center_x + num
-                min_x = self.player_sprite.center_x - num
-                max_y = self.player_sprite.center_y + num
-                min_y = self.player_sprite.center_y - num
-                if bullet.center_x > max_x or bullet.center_x < min_x or bullet.center_y > max_y or bullet.center_y < min_y:
-                    bullet.remove_from_sprite_lists()
+                    # Check this bullet to see if it flew too far
+                    num = 500
+                    max_x = self.player_sprite.center_x + num
+                    min_x = self.player_sprite.center_x - num
+                    max_y = self.player_sprite.center_y + num
+                    min_y = self.player_sprite.center_y - num
+                    if bullet.center_x > max_x or bullet.center_x < min_x or bullet.center_y > max_y or bullet.center_y < min_y:
+                        bullet.remove_from_sprite_lists()
 
-            for coin in self.coin_list:
-                hit_list = arcade.check_for_collision_with_list(coin, self.fireball_list)
-                if len(hit_list) > 0:
-                    arcade.play_sound(self.coin_sound)
-                    coin.remove_from_sprite_lists()
-                    fireball.remove_from_sprite_lists()
-                    self.score += 1
-                hit_list = arcade.check_for_collision_with_list(coin, self.player_list)
-                if len(hit_list) > 0:
-                    arcade.play_sound(self.coin_sound)
-                    coin.remove_from_sprite_lists()
-                    self.score += 1
-                hit_list = arcade.check_for_collision_with_list(coin, self.bullet_list)
-                if len(hit_list) > 0:
-                    arcade.play_sound(self.hit_sound)
-                    coin.remove_from_sprite_lists()
-                    bullet.remove_from_sprite_lists()
+                for bomb in self.bomb_list:
 
-            if self.player_sprite.center_y < -300:
-                self.LIVES = 0
+                    # Check this bomb to see if it hit a wall
+                    hit_list = arcade.check_for_collision_with_list(bomb, self.wall_list)
+                    # If it did, get rid of the bullet
+                    if len(hit_list) > 0:
+                        # Make an explosion
+                        explosion = Explosion(self.explosion_texture_list)
+                        # Move it to the location of the box
+                        explosion.center_x = bomb.center_x
+                        explosion.center_y = bomb.center_y
+                        # Call update() because it sets which image we start on
+                        explosion.update()
+                        # Add to a list of sprites that are explosions
+                        self.explosions_list.append(explosion)
+                        bomb.remove_from_sprite_lists()
+                        arcade.play_sound(self.explosion_sound)
+                    # Check this bomb to see if it hit the player
+                    hit_list = arcade.check_for_collision_with_list(bomb, self.player_list)
+                    # If it did, get rid of the bullet
+                    if len(hit_list) > 0:
+                        # Make an explosion
+                        explosion = Explosion(self.explosion_texture_list)
+                        # Move it to the location of the box
+                        explosion.center_x = bomb.center_x
+                        explosion.center_y = bomb.center_y
+                        # Call update() because it sets which image we start on
+                        explosion.update()
+                        # Add to a list of sprites that are explosions
+                        self.explosions_list.append(explosion)
+                        bomb.remove_from_sprite_lists()
+                        arcade.play_sound(self.explosion_sound)
+                        self.LIVES -= 2
+                    hit_list = arcade.check_for_collision_with_list(bomb, self.fireball_list)
+                    # If it did, get rid of the bullet
+                    if len(hit_list) > 0:
+                        # Make an explosion
+                        explosion = Explosion(self.explosion_texture_list)
+                        # Move it to the location of the box
+                        explosion.center_x = bomb.center_x
+                        explosion.center_y = bomb.center_y
+                        # Call update() because it sets which image we start on
+                        explosion.update()
+                        # Add to a list of sprites that are explosions
+                        self.explosions_list.append(explosion)
+                        bomb.remove_from_sprite_lists()
+                        arcade.play_sound(self.explosion_sound)
+                        fireball.remove_from_sprite_lists()
+
+                    # Check this bomb to see if it flew too far
+                    num = 200
+                    max_x = goblin.center_x + num
+                    min_x = goblin.center_x - num
+                    max_y = goblin.center_y + num
+                    min_y = goblin.center_y - num
+                    if bomb.center_x > max_x or bomb.center_x < min_x or bomb.center_y > max_y or bomb.center_y < min_y:
+                        # Make an explosion
+                        explosion = Explosion(self.explosion_texture_list)
+                        # Move it to the location of the box
+                        explosion.center_x = bomb.center_x
+                        explosion.center_y = bomb.center_y
+                        # Call update() because it sets which image we start on
+                        explosion.update()
+                        # Add to a list of sprites that are explosions
+                        self.explosions_list.append(explosion)
+                        bomb.remove_from_sprite_lists()
+                        arcade.play_sound(self.explosion_sound)
+
+                for coin in self.coin_list:
+                    hit_list = arcade.check_for_collision_with_list(coin, self.fireball_list)
+                    if len(hit_list) > 0:
+                        arcade.play_sound(self.coin_sound)
+                        coin.remove_from_sprite_lists()
+                        fireball.remove_from_sprite_lists()
+                        self.score += 1
+                    hit_list = arcade.check_for_collision_with_list(coin, self.player_list)
+                    if len(hit_list) > 0:
+                        arcade.play_sound(self.coin_sound)
+                        coin.remove_from_sprite_lists()
+                        self.score += 1
+                    hit_list = arcade.check_for_collision_with_list(coin, self.bullet_list)
+                    if len(hit_list) > 0:
+                        arcade.play_sound(self.hit_sound)
+                        coin.remove_from_sprite_lists()
+                        bullet.remove_from_sprite_lists()
+                    hit_list = arcade.check_for_collision_with_list(coin, self.bomb_list)
+                    # If it did, get rid of the bullet
+                    if len(hit_list) > 0:
+                        arcade.play_sound(self.hit_sound)
+                        coin.remove_from_sprite_lists()
+
+                if self.player_sprite.center_y < -300:
+                    self.LIVES = 0
 
     def scroll_to_player(self):
         """

@@ -48,6 +48,49 @@ class Mana_Bar(arcade.Sprite):
         self.set_texture(frame)
 
 
+class Goblin(arcade.Sprite):
+    def __init__(self, texture_list, wall_list, box_list, coinbox_list):
+        super().__init__()
+
+        # Start at the first frame
+        self.current_texture = 0
+        self.textures = texture_list
+
+        self.last_first_frame = 0
+
+        self.physics_engine = None
+        self.box_physics_engine = None
+        self.coinbox_physics_engine = None
+
+        self.walls = wall_list
+        self.boxes = box_list
+        self.coinboxes = coinbox_list
+
+    def setup(self):
+        self.physics_engine = arcade.PhysicsEnginePlatformer(
+            self,
+            self.walls,
+            gravity_constant=GRAVITY
+        )
+        self.box_physics_engine = arcade.PhysicsEnginePlatformer(
+            self,
+            self.boxes,
+            gravity_constant=0
+        )
+        self.coinbox_physics_engine = arcade.PhysicsEnginePlatformer(
+            self,
+            self.coinboxes,
+            gravity_constant=0
+        )
+
+    def update(self):
+        self.setup()
+        self.set_texture(0)
+        self.physics_engine.update()
+        self.box_physics_engine.update()
+        self.coinbox_physics_engine.update()
+
+
 class Tree_Goblin(arcade.Sprite):
     def __init__(self, texture_list):
         super().__init__()
@@ -202,7 +245,6 @@ class MyGame(arcade.Window):
         self.boxes_physics_engine = None
         self.coin_boxes_physics_engine = None
         self.goblin_boxes_physics_engine = None
-        self.goblin_physics_engine = None
         self.tree_goblin_physics_engine = None
         self.tree_goblin_boxes_physics_engine = None
         self.entity_physics_engine = None
@@ -240,7 +282,7 @@ class MyGame(arcade.Window):
         # Load sounds
         self.fireball_sound = arcade.sound.load_sound("laser.wav")
         self.hit_sound = arcade.sound.load_sound(":resources:sounds/hurt1.wav")
-        self.explosion_sound = arcade.sound.load_sound("Boom.wav")
+        self.explosion_sound = arcade.sound.load_sound(":resources:sounds/explosion2.wav")
         self.coin_sound = arcade.sound.load_sound(":resources:sounds/coin1.wav")
 
     def setup(self):
@@ -259,6 +301,23 @@ class MyGame(arcade.Window):
         self.fireball_list = arcade.SpriteList()
         self.bullet_list = arcade.SpriteList()
 
+        # --- Load our map
+
+        # Read in the tiled map
+        map_name = "Level1.json"
+        self.tile_map = arcade.load_tilemap(map_name, scaling=TILE_SCALING)
+
+        # Set wall and coin SpriteLists
+        # Any other layers here. Array index must be a layer.
+        self.wall_list = self.tile_map.sprite_lists["Walls"]
+        self.coinbox_list = self.tile_map.sprite_lists["Coin Boxes"]
+        self.box_list = self.tile_map.sprite_lists["Boxes"]
+        self.explodingbox_list = self.tile_map.sprite_lists["Explodey Boxes"]
+
+        # self.coin_list = self.tile_map.sprite_lists["Coins"]
+
+        # --- Other stuff
+
         # Set up the player
         def draw_player(x, y):
             player_texture_list = arcade.load_spritesheet("Wiz.png", 64, 64, 3, 8)
@@ -274,12 +333,14 @@ class MyGame(arcade.Window):
 
         # Set up the Goblins
         def draw_goblin(x, y):
-            self.goblin_sprite = arcade.Sprite("Gob.png",
-                                               scale=0.4)
+            goblin_texture_list = arcade.load_spritesheet("Gob.png", 64, 64, 1, 2)
+            self.goblin_sprite = Goblin(goblin_texture_list, self.wall_list, self.box_list, self.coinbox_list)
             self.goblin_sprite.center_x = x
             self.goblin_sprite.center_y = y
             self.goblin_list.append(self.goblin_sprite)
-        draw_goblin(250, 300)
+        #draw_goblin(500, 200)
+        #draw_goblin(900, 250)
+        #draw_goblin(1000, 200)
 
         # Set up Tree Goblins
         def draw_tree_goblin(x, y):
@@ -290,22 +351,6 @@ class MyGame(arcade.Window):
             self.tree_goblin_list.append(self.tree_goblin_sprite)
         draw_tree_goblin(1771, 342)
 
-
-        # --- Load our map
-
-        # Read in the tiled map
-        map_name = "Level1.json"
-        self.tile_map = arcade.load_tilemap(map_name, scaling=TILE_SCALING)
-
-        # Set wall and coin SpriteLists
-        # Any other layers here. Array index must be a layer.
-        self.wall_list = self.tile_map.sprite_lists["Walls"]
-        self.coinbox_list = self.tile_map.sprite_lists["Coin Boxes"]
-        self.box_list = self.tile_map.sprite_lists["Boxes"]
-        self.explodingbox_list = self.tile_map.sprite_lists["Explodey Boxes"]
-        # self.coin_list = self.tile_map.sprite_lists["Coins"]
-
-        # --- Other stuff
         # Set the background color
         arcade.set_background_color(arcade.color.SKY_BLUE)
 
@@ -315,29 +360,15 @@ class MyGame(arcade.Window):
             self.wall_list,
             gravity_constant=GRAVITY
         )
-
-        # for i in range(0, len(self.goblin_list)):
-        for goblin in range(len(self.goblin_list)):
-            self.goblin_physics_engine = arcade.PhysicsEnginePlatformer(
-                self.goblin_list[goblin],
-                self.wall_list,
-                gravity_constant=GRAVITY
-            )
-        self.goblin_boxes_physics_engine = arcade.PhysicsEnginePlatformer(
-            self.goblin_sprite,
-            self.box_list,
-            gravity_constant=0
-        )
-
-        self.tree_goblin_boxes_physics_engine = arcade.PhysicsEnginePlatformer(
-            self.tree_goblin_sprite,
-            self.box_list,
-            gravity_constant=0
-        )
         self.tree_goblin_physics_engine = arcade.PhysicsEnginePlatformer(
             self.tree_goblin_sprite,
             self.wall_list,
             gravity_constant=GRAVITY
+        )
+        self.tree_goblin_boxes_physics_engine = arcade.PhysicsEnginePlatformer(
+            self.tree_goblin_sprite,
+            self.box_list,
+            gravity_constant=0
         )
         self.entity_physics_engine = arcade.PhysicsEnginePlatformer(
             self.player_sprite,
@@ -542,16 +573,8 @@ class MyGame(arcade.Window):
             )
             self.coin_boxes_physics_engine.update()
             self.entity_physics_engine.update()
-            self.goblin_physics_engine.update()
             self.tree_goblin_boxes_physics_engine.update()
             self.tree_goblin_physics_engine.update()
-            self.goblin_boxes_physics_engine.update()
-            self.goblin_boxes_physics_engine = arcade.PhysicsEnginePlatformer(
-                self.goblin_sprite,
-                self.coinbox_list,
-                gravity_constant=0
-            )
-            self.goblin_boxes_physics_engine.update()
 
             # Scroll the screen to the player
             self.scroll_to_player()
@@ -564,14 +587,6 @@ class MyGame(arcade.Window):
                 # If it did, get rid of the fireball
                 if len(hit_list) > 0:
                     fireball.remove_from_sprite_lists()
-                # Check this fireball to see if it hit a goblin
-                hit_list = arcade.check_for_collision_with_list(fireball, self.goblin_list)
-                # If it did, get rid of the fireball and goblin
-                if len(hit_list) > 0:
-                    arcade.play_sound(self.hit_sound)
-                    fireball.remove_from_sprite_lists()
-                    self.goblin_sprite.remove_from_sprite_lists()
-                    self.score += 5
                 # Check this fireball to see if it hit a tree goblin
                 hit_list = arcade.check_for_collision_with_list(fireball, self.tree_goblin_list)
                 # If it did, get rid of the fireball and goblin
@@ -737,6 +752,14 @@ class MyGame(arcade.Window):
                         # Loop through each standard goblin that we have
                     for goblin in self.goblin_list:
 
+                        hit_list = arcade.check_for_collision_with_list(goblin, self.fireball_list)
+                        # If it did, get rid of the fireball and goblin
+                        if len(hit_list) > 0:
+                            goblin.remove_from_sprite_lists()
+                            fireball.remove_from_sprite_lists()
+                            arcade.play_sound(self.hit_sound)
+                            self.score += 5
+
                         # First, calculate the angle to the player. We could do this
                         # only when the bullet fires, but in this case we will rotate
                         # the enemy to face the player each frame, so we'll do this
@@ -764,8 +787,10 @@ class MyGame(arcade.Window):
                         if math.fabs(goblin.center_x - self.player_sprite.center_x) <= 300:
                             if goblin.center_x > self.player_sprite.center_x:
                                 goblin.center_x -= GOBLIN_MOVEMENT_SPEED
+                                goblin.set_texture(0)
                             elif goblin.center_x < self.player_sprite.center_x:
                                 goblin.center_x += GOBLIN_MOVEMENT_SPEED
+                                goblin.set_texture(1)
 
                         # Shoot every 60-180 frames change of shooting each frame
                         if self.frame_count % random.randint(20, 100) == 0:
